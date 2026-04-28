@@ -24,7 +24,17 @@ keyAlias=your_alias
 keyPassword=your_password
 ```
 
-## Build steps
+## Easy build
+
+Run the build script from repo root:
+
+```bash
+./scripts/build-android.sh
+```
+
+This sets up environment variables, runs the arm64 build, and copies the APK to `app-universal-release.apk`.
+
+## Manual build steps
 
 > **Important:** JDK 21 is required. JDK 26+ is incompatible with Gradle 8.14.3 and will cause build failures. If `java -version` shows 26 or higher, ensure JAVA_HOME points to JDK 21.
 
@@ -42,9 +52,7 @@ bun run tauri android build --apk --target aarch64
 
 ## Output APK
 
-Build output path:
-
-`packages/android/src-tauri/gen/android/app/build/outputs/apk/universal/release/app-universal-release.apk`
+The script automatically copies the APK to `app-universal-release.apk` in the repo root.
 
 > **Note on `beforeBuildCommand`:** The build runs a `beforeBuildCommand` defined in `src-tauri/tauri.conf.json` that requires `tsgo` to be in PATH. If you see `Command not found: tsgo`, run the vite build manually first from `packages/app`: `bun run build`. The tauri build will then use the pre-built web assets.
 
@@ -64,12 +72,20 @@ export ANDROID_HOME="$HOME/Library/Android/sdk"
 "$ANDROID_HOME/build-tools/35.0.0/apksigner" verify --print-certs packages/android/src-tauri/gen/android/app/build/outputs/apk/universal/release/app-universal-release.apk
 ```
 
-## Copy APK to repo root (for easy GitHub download)
-
-From repo root:
+## Optional verification
 
 ```bash
-mv packages/android/src-tauri/gen/android/app/build/outputs/apk/universal/release/app-universal-release.apk app-universal-release.apk
+ls -lh app-universal-release.apk
+shasum -a 256 app-universal-release.apk
+```
+
+If Java is not in your shell path, verify signature with:
+
+```bash
+export JAVA_HOME="/opt/homebrew/opt/openjdk@21/libexec/openjdk.jdk/Contents/Home"
+export PATH="$JAVA_HOME/bin:$PATH"
+export ANDROID_HOME="$HOME/Library/Android/sdk"
+"$ANDROID_HOME/build-tools/35.0.0/apksigner" verify --print-certs app-universal-release.apk
 ```
 
 ## Upload branch with APK
