@@ -32,6 +32,7 @@ tsconfig.tsbuildinfo
 packages/android/src-tauri/**/build/
 packages/android/src-tauri/gen/
 packages/android/release.keystore
+packages/android/release.jks
 todo.md
 *.internal.md
 *.tgz

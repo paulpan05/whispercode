@@ -159,7 +159,7 @@ function mergeSession(setStore: SetStoreFunction<State>, session: Session) {
   })
 }
 
-function warmSessions(input: {
+export function warmSessions(input: {
   ids: string[]
   store: Store<State>
   setStore: SetStoreFunction<State>
