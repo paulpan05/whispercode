@@ -11,8 +11,8 @@ import type {
   Todo,
 } from "@opencode-ai/sdk/v2/client"
 import { showToast } from "@opencode-ai/ui/toast"
-import { getFilename } from "@opencode-ai/shared/util/path"
-import { retry } from "@opencode-ai/shared/util/retry"
+import { getFilename } from "@opencode-ai/core/util/path"
+import { retry } from "@opencode-ai/core/util/retry"
 import { batch } from "solid-js"
 import { reconcile, type SetStoreFunction, type Store } from "solid-js/store"
 import type { State, VcsCache } from "./types"
@@ -78,7 +78,7 @@ export async function bootstrapGlobal(input: {
     () =>
       retry(() =>
         input.globalSDK.global.config.get().then((x) => {
-          input.setGlobalStore("config", x.data!)
+          input.setGlobalStore("config", reconcile(x.data!, { merge: false }))
         }),
       ),
   ]
@@ -159,39 +159,24 @@ function mergeSession(setStore: SetStoreFunction<State>, session: Session) {
   })
 }
 
-export function warmSessions(input: {
+function warmSessions(input: {
   ids: string[]
   store: Store<State>
   setStore: SetStoreFunction<State>
   sdk: OpencodeClient
 }) {
   const known = new Set(input.store.session.map((item) => item.id))
-  const seen = new Set<string>()
-
-  const load = async (sessionID: string): Promise<void> => {
-    if (!sessionID || seen.has(sessionID)) return
-    seen.add(sessionID)
-
-    const existing = input.store.session.find((item) => item.id === sessionID)
-    if (existing) {
-      known.add(existing.id)
-      if (existing.parentID) await load(existing.parentID)
-      return
-    }
-
-    const x = await retry(() => input.sdk.session.get({ sessionID }))
-    const session = x.data
-    if (!session?.id) return
-    known.add(session.id)
-    mergeSession(input.setStore, session)
-    // UPSTREAM-DIVERGENCE: Mobile resume can restore permission/question requests after the app was
-    // suspended, so warm the full ancestor chain the session request tree needs to show prompts.
-    if (session.parentID) await load(session.parentID)
-  }
-
   const ids = [...new Set(input.ids)].filter((id) => !!id && !known.has(id))
-  const existing = [...new Set(input.ids)].filter((id) => !!id && known.has(id))
-  return Promise.all([...ids, ...existing].map(load)).then(() => undefined)
+  if (ids.length === 0) return Promise.resolve()
+  return Promise.all(
+    ids.map((sessionID) =>
+      retry(() => input.sdk.session.get({ sessionID })).then((x) => {
+        const session = x.data
+        if (!session?.id) return
+        mergeSession(input.setStore, session)
+      }),
+    ),
+  ).then(() => undefined)
 }
 
 export const loadProvidersQuery = (directory: string | null) =>
@@ -260,7 +245,7 @@ export async function bootstrapDirectory(input: {
     input.setStore("provider", input.global.provider)
   }
   if (Object.keys(input.store.config).length === 0 && Object.keys(input.global.config).length > 0) {
-    input.setStore("config", input.global.config)
+    input.setStore("config", reconcile(input.global.config, { merge: false }))
   }
   if (loading || input.store.provider.all.length === 0) {
     input.setStore("provider_ready", false)
@@ -280,17 +265,9 @@ export async function bootstrapDirectory(input: {
         input.queryClient.ensureQueryData(
           loadAgentsQuery(input.directory, input.sdk, (x) => input.setStore("agent", normalizeAgentList(x.data))),
         ),
-      () => retry(() => input.sdk.config.get().then((x) => input.setStore("config", x.data!))),
-      // UPSTREAM-DIVERGENCE: Fork mobile resume paths depend on bootstrap being tolerant of transient
-      // session-status failures instead of aborting the rest of the shared directory refresh.
       () =>
-        retry(() => input.sdk.session.status())
-          .then((x) => {
-            input.setStore("session_status", reconcile(x.data ?? {}))
-          })
-          .catch((err) => {
-            console.error("Failed to load session status", err)
-          }),
+        retry(() => input.sdk.config.get().then((x) => input.setStore("config", reconcile(x.data!, { merge: false })))),
+      () => retry(() => input.sdk.session.status().then((x) => input.setStore("session_status", x.data!))),
       !seededProject &&
         (() => retry(() => input.sdk.project.current()).then((x) => input.setStore("project", x.data!.id))),
       !seededPath &&
