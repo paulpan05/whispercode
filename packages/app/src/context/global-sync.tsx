@@ -211,6 +211,9 @@ function createGlobalSync() {
     },
     translate: language.t,
     getSdk: sdkFor,
+    global: {
+      provider: globalStore.provider,
+    },
   })
 
   const RESUME_REFRESH_COOLDOWN_MS = 1000
