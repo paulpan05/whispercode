@@ -1,21 +1,20 @@
 #!/bin/bash
 set -euo pipefail
 
-# Android build-and-install script for WhisperCode
-# Usage: ./build-and-install.sh
-
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 cd "$SCRIPT_DIR"
 
-# Environment setup
-export JAVA_HOME="/opt/homebrew/opt/openjdk@21/libexec/openjdk.jdk/Contents/Home"
-export ANDROID_HOME="$HOME/Library/Android/sdk"
-export NDK_HOME="$ANDROID_HOME/ndk/27.0.12077973"
+export JAVA_HOME="${JAVA_HOME:-/opt/homebrew/opt/openjdk@21/libexec/openjdk.jdk/Contents/Home}"
+export ANDROID_HOME="${ANDROID_HOME:-$HOME/Library/Android/sdk}"
 export PATH="$JAVA_HOME/bin:$ANDROID_HOME/platform-tools:$PATH"
 
-# Verify prerequisites
 if [ ! -d "$JAVA_HOME" ]; then
   echo "ERROR: JDK 21 not found. Install with: brew install openjdk@21"
+  exit 1
+fi
+
+if ! command -v adb &>/dev/null; then
+  echo "ERROR: adb not found. Install Android SDK platform-tools."
   exit 1
 fi
 
@@ -28,9 +27,17 @@ echo "==> Building frontend..."
 bun run build
 
 echo "==> Building APK..."
-bun run tauri android build --apk --debug
+cd android-app
+chmod +x gradlew 2>/dev/null || true
 
-APK="$SCRIPT_DIR/src-tauri/gen/android/app/build/outputs/apk/universal/debug/app-universal-debug.apk"
+if [ ! -f gradlew ]; then
+  echo "==> Generating Gradle wrapper..."
+  gradle wrapper --gradle-version 8.11.1
+fi
+
+./gradlew assembleDebug 2>&1
+
+APK="$SCRIPT_DIR/android-app/app/build/outputs/apk/debug/app-debug.apk"
 if [ ! -f "$APK" ]; then
   echo "ERROR: APK not found at $APK"
   exit 1
@@ -40,4 +47,4 @@ echo "==> Installing on device..."
 adb install -r "$APK"
 
 echo "==> Done! Launching app..."
-adb shell am start -n com.devgriffin.whispercode/.MainActivity
+adb shell am start -n com.devgriffin.whispercode/ai.opencode.app.MainActivity

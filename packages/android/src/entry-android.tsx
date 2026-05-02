@@ -1,15 +1,9 @@
-// @refresh reload
 import { render } from "solid-js/web"
 import { createResource, createSignal, onCleanup, onMount, Show } from "solid-js"
 import { AppBaseProviders, AppInterface, PlatformProvider, ServerConnection, type Platform } from "@opencode-ai/app"
 import { showToast } from "@opencode-ai/ui/toast"
-import { requestPermissions } from "@tauri-apps/api/core"
-import { impactFeedback, notificationFeedback } from "@tauri-apps/plugin-haptics"
-import { isPermissionGranted, requestPermission, sendNotification } from "@tauri-apps/plugin-notification"
-import { openUrl } from "@tauri-apps/plugin-opener"
-import { Store } from "@tauri-apps/plugin-store"
 import { bridge } from "./bridge"
-import { createTauriStorage } from "./storage"
+import { createBridgeStorage } from "./storage"
 import { VoiceInputOverlay } from "./voice-input"
 import { Onboarding } from "./onboarding"
 import pkg from "../package.json"
@@ -31,67 +25,17 @@ type VoiceStopResult = {
   message?: string
 }
 
-const SETTINGS_STORE = "opencode.settings.dat"
-const DEFAULT_SERVER_URL_KEY = "defaultServerUrl"
-const DEFAULT_SERVER_USERNAME_KEY = "defaultServerUsername"
-const DEFAULT_SERVER_PASSWORD_KEY = "defaultServerPassword"
-const DEFAULT_SERVER_DISPLAY_NAME_KEY = "defaultServerDisplayName"
-const settingsStore = Store.load(SETTINGS_STORE)
-
 type ServerConfig = { url: string; displayName?: string; username?: string; password?: string }
+
+const BRIDGE_MS = 20_000
+const settingsStorage = createBridgeStorage()
+const credentialStorage = createBridgeStorage("opencode.settings.dat")
 
 const normalizeServerUrl = (input: string) => {
   const trimmed = input.trim()
   if (!trimmed) return
   const withProtocol = /^https?:\/\//.test(trimmed) ? trimmed : `http://${trimmed}`
   return withProtocol.replace(/\/+$/, "")
-}
-
-const getDefaultServerConfig = async (): Promise<ServerConfig | null> => {
-  const store = await settingsStore
-  const url = await store.get(DEFAULT_SERVER_URL_KEY).catch(() => null)
-  if (typeof url !== "string") return null
-  const displayName = await store.get(DEFAULT_SERVER_DISPLAY_NAME_KEY).catch(() => null)
-  const username = await store.get(DEFAULT_SERVER_USERNAME_KEY).catch(() => null)
-  const password = await store.get(DEFAULT_SERVER_PASSWORD_KEY).catch(() => null)
-  return {
-    url,
-    displayName: typeof displayName === "string" ? displayName : undefined,
-    username: typeof username === "string" ? username : undefined,
-    password: typeof password === "string" ? password : undefined,
-  }
-}
-
-const setDefaultServerConfig = async (config: ServerConfig | null) => {
-  const store = await settingsStore
-  if (config) {
-    await store.set(DEFAULT_SERVER_URL_KEY, config.url).catch(() => undefined)
-    if (config.displayName) await store.set(DEFAULT_SERVER_DISPLAY_NAME_KEY, config.displayName).catch(() => undefined)
-    else await store.delete(DEFAULT_SERVER_DISPLAY_NAME_KEY).catch(() => undefined)
-    if (config.username) await store.set(DEFAULT_SERVER_USERNAME_KEY, config.username).catch(() => undefined)
-    else await store.delete(DEFAULT_SERVER_USERNAME_KEY).catch(() => undefined)
-    if (config.password) await store.set(DEFAULT_SERVER_PASSWORD_KEY, config.password).catch(() => undefined)
-    else await store.delete(DEFAULT_SERVER_PASSWORD_KEY).catch(() => undefined)
-  } else {
-    await store.delete(DEFAULT_SERVER_URL_KEY).catch(() => undefined)
-    await store.delete(DEFAULT_SERVER_DISPLAY_NAME_KEY).catch(() => undefined)
-    await store.delete(DEFAULT_SERVER_USERNAME_KEY).catch(() => undefined)
-    await store.delete(DEFAULT_SERVER_PASSWORD_KEY).catch(() => undefined)
-  }
-  await store.save().catch(() => undefined)
-}
-
-const getDefaultServerUrl = async () => {
-  const config = await getDefaultServerConfig()
-  return config?.url ? ServerConnection.Key.make(config.url) : null
-}
-
-const setDefaultServerUrl = async (url: ServerConnection.Key | null) => {
-  if (url) {
-    await setDefaultServerConfig({ url })
-  } else {
-    await setDefaultServerConfig(null)
-  }
 }
 
 const root = document.getElementById("root")
@@ -142,6 +86,18 @@ const App = () => {
     }
   }
 
+  const call = async <T,>(method: string, params?: unknown, ms = BRIDGE_MS): Promise<T | null> => {
+    const abort = new AbortController()
+    const timer = globalThis.setTimeout(() => {
+      abort.abort(new Error(`${method} timed out`))
+    }, ms)
+    try {
+      return await bridge.sendAsync<T>(method, params, { signal: abort.signal })
+    } finally {
+      globalThis.clearTimeout(timer)
+    }
+  }
+
   const refreshVoice = async () => {
     const result = await bridge.sendAsync<VoiceStatus>("isWhisperReady")
     const status = normalizeStatus(result)
@@ -150,7 +106,6 @@ const App = () => {
   }
 
   const startVoiceInput = async (): Promise<VoiceStartResult> => {
-    await requestPermissions("mobile-bridge").catch(() => undefined)
     const result = await bridge.sendAsync<VoiceStartResult>("startRecording")
     if (result?.ok) {
       setVoice({ state: "recording", ready: false })
@@ -193,49 +148,46 @@ const App = () => {
     platform: "android",
     os: "android",
     version: pkg.version,
-    openLink: (url: string) => {
-      void openUrl(url).catch(() => undefined)
-    },
-    notify: async (title: string, description?: string, href?: string, opts?: unknown) => {
-      void href
-      void opts
-      const granted = await isPermissionGranted().catch(() => false)
-      const permission = granted ? "granted" : await requestPermission().catch(() => "denied")
-      if (permission !== "granted") return
-      await Promise.resolve()
-        .then(() =>
-          sendNotification({
-            title,
-            body: description ?? "",
-          }),
-        )
-        .catch(() => undefined)
+    openLink: (url: string) => bridge.send("openLink", { url }),
+    notify: async (title, description, href, opts) => {
+      await bridge.sendAsync("notify", { title, description, href, opts })
     },
     back: () => window.history.back(),
     forward: () => window.history.forward(),
-    restart: async () => window.location.reload(),
+    restart: async () => bridge.send("reload"),
     voiceStatus: voice,
     startVoiceInput,
     stopVoiceInput,
     haptic: (style: "light" | "medium" | "heavy" | "success" | "warning" | "error") => {
-      if (style === "success" || style === "warning" || style === "error") {
-        void notificationFeedback(style).catch(() => undefined)
-        return
-      }
-      void impactFeedback(style).catch(() => undefined)
+      bridge.send("haptic", { style })
     },
     share: async (data: { text?: string; url?: string }) => {
       const result = await bridge.sendAsync<boolean>("share", data)
       return result ?? false
     },
-    getDefaultServer: getDefaultServerUrl,
-    setDefaultServer: setDefaultServerUrl,
-    storage: (name?: string) => createTauriStorage(name),
+    getDefaultServer: async () => {
+      const result = await bridge.sendAsync<string | null>("getDefaultServerUrl")
+      return result ? ServerConnection.Key.make(result) : null
+    },
+    setDefaultServer: async (url: ServerConnection.Key | null) => {
+      await bridge.sendAsync("setDefaultServerUrl", { url })
+    },
+    storage: (name?: string) => createBridgeStorage(name),
   }
 
   const [defaultConfig] = createResource(async () => {
-    const config = await getDefaultServerConfig()
-    return config ?? null
+    if (!platform.getDefaultServer) return null
+    const url = await Promise.resolve(platform.getDefaultServer?.()).catch(() => null)
+    if (!url) return null
+    const displayName = await credentialStorage.getItem("displayName").catch(() => null)
+    const username = await credentialStorage.getItem("username").catch(() => null)
+    const password = await credentialStorage.getItem("password").catch(() => null)
+    return {
+      url: String(url),
+      displayName: displayName || undefined,
+      username: username || undefined,
+      password: password || undefined,
+    } as ServerConfig
   })
 
   const [completedConfig, setCompletedConfig] = createSignal<ServerConfig | null>(null)
@@ -248,14 +200,19 @@ const App = () => {
   }) => {
     const normalized = normalizeServerUrl(server.url)
     if (!normalized) return
-    const config: ServerConfig = {
+    await platform.setDefaultServer?.(ServerConnection.Key.make(normalized))
+    if (server.displayName) await credentialStorage.setItem("displayName", server.displayName)
+    else await credentialStorage.removeItem("displayName")
+    if (server.username) await credentialStorage.setItem("username", server.username)
+    else await credentialStorage.removeItem("username")
+    if (server.password) await credentialStorage.setItem("password", server.password)
+    else await credentialStorage.removeItem("password")
+    setCompletedConfig({
       url: normalized,
       displayName: server.displayName,
       username: server.username,
       password: server.password,
-    }
-    await setDefaultServerConfig(config)
-    setCompletedConfig(config)
+    })
   }
 
   onMount(() => {
@@ -289,6 +246,18 @@ const App = () => {
       if (status.state === "error") showVoiceError(status.message)
     })
 
+    const stopLifecycle = bridge.on("appLifecycle", (payload) => {
+      const state =
+        typeof payload === "string"
+          ? payload
+          : typeof payload === "object" && payload
+            ? (payload as { state?: unknown }).state
+            : undefined
+      if (state !== "active") return
+      void refreshVoice()
+      emitResume()
+    })
+
     document.addEventListener("click", handleClick)
     window.addEventListener("focus", onFocus)
     document.addEventListener("visibilitychange", onVisible)
@@ -298,20 +267,13 @@ const App = () => {
       document.removeEventListener("visibilitychange", onVisible)
       stopListening()
       stopVoiceState()
+      stopLifecycle()
     })
   })
 
   return (
     <PlatformProvider value={platform}>
       <AppBaseProviders>
-        <VoiceInputOverlay
-          state={() => {
-            const state = voice().state
-            if (state === "recording" || state === "processing") return state
-            return "hidden"
-          }}
-          onStop={() => void stopVoiceInput()}
-        />
         <Show when={!defaultConfig.loading}>
           <Show
             when={defaultConfig() || completedConfig()}
@@ -329,7 +291,20 @@ const App = () => {
                     password: config.password,
                   },
                 }
-                return { defaultServer: ServerConnection.key(conn), servers: [conn] }
+                return {
+                  defaultServer: ServerConnection.key(conn),
+                  servers: [conn],
+                  children: (
+                    <VoiceInputOverlay
+                      state={() => {
+                        const state = voice().state
+                        if (state === "recording" || state === "processing") return state
+                        return "hidden"
+                      }}
+                      onStop={() => void stopVoiceInput()}
+                    />
+                  ),
+                }
               })()}
             />
           </Show>

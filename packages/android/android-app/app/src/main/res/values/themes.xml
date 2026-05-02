@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <style name="Theme.WhisperCode" parent="Theme.MaterialComponents.DayNight.NoActionBar">
+        <item name="colorPrimary">#131010</item>
+        <item name="colorOnPrimary">#F8F7F7</item>
+        <item name="android:statusBarColor">@android:color/transparent</item>
+        <item name="android:navigationBarColor">@android:color/transparent</item>
+        <item name="android:windowBackground">#131010</item>
+    </style>
+</resources>

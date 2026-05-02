@@ -34,15 +34,9 @@
         "@opencode-ai/app": "workspace:*",
         "@opencode-ai/ui": "workspace:*",
         "@solid-primitives/storage": "catalog:",
-        "@tauri-apps/api": "^2",
-        "@tauri-apps/plugin-haptics": "~2",
-        "@tauri-apps/plugin-notification": "~2",
-        "@tauri-apps/plugin-opener": "^2",
-        "@tauri-apps/plugin-store": "~2",
         "solid-js": "catalog:",
       },
       "devDependencies": {
-        "@tauri-apps/cli": "^2",
         "@types/bun": "catalog:",
         "@typescript/native-preview": "catalog:",
         "typescript": "catalog:",
@@ -2371,8 +2365,6 @@
     "@tauri-apps/plugin-deep-link": ["@tauri-apps/plugin-deep-link@2.4.8", "", { "dependencies": { "@tauri-apps/api": "^2.10.1" } }, "sha512-Cd2Cs960MGuGONeIwxOPx9wqwedetAHOGlwK5boJ/SMTfAtAyfErpfVPEn+EJzgXsJun8EKzsEumHjr+64V4fw=="],
 
     "@tauri-apps/plugin-dialog": ["@tauri-apps/plugin-dialog@2.7.0", "", { "dependencies": { "@tauri-apps/api": "^2.10.1" } }, "sha512-4nS/hfGMGCXiAS3LtVjH9AgsSAPJeG/7R+q8agTFqytjnMa4Zq95Bq8WzVDkckpanX+yyRHXnRtrKXkANKDHvw=="],
-
-    "@tauri-apps/plugin-haptics": ["@tauri-apps/plugin-haptics@2.3.2", "", { "dependencies": { "@tauri-apps/api": "^2.8.0" } }, "sha512-TqvBR5JoPodDQWPXsNymmyqp37dOpunZOdVVbx5xOAxki7rVwiCMvoEPdtJQNIrU+dQDfkQYZ2oDBVOu4hf+ig=="],
 
     "@tauri-apps/plugin-http": ["@tauri-apps/plugin-http@2.5.8", "", { "dependencies": { "@tauri-apps/api": "^2.10.1" } }, "sha512-oxd7oypzQeu8kAfFCrw534Kq7Cw+NzozcnCY21O4rz3A+veJiIiuSCMIprgGcZOcLAXFP9GmDhKUbhuKWcunRw=="],
 

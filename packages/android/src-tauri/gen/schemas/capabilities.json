@@ -1,1 +1,0 @@
-{"default":{"identifier":"default","description":"Default capability for Android","local":true,"windows":["main"],"permissions":["core:default","haptics:default","notification:default","opener:default","store:default","mobile-bridge:default"]}}
