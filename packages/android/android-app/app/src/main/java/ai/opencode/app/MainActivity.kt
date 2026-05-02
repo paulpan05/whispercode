@@ -47,7 +47,6 @@ class MainActivity : AppCompatActivity() {
 
         bridgeController = BridgeController(this, webView)
 
-        setupInsets()
         setupBackHandler()
 
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
@@ -123,20 +122,6 @@ class MainActivity : AppCompatActivity() {
             webView.loadUrl("http://localhost:1422")
         } else {
             webView.loadUrl("file:///android_asset/WebAssets/index.html")
-        }
-    }
-
-    private fun setupInsets() {
-        val rootView = webView.rootView
-        ViewCompat.setOnApplyWindowInsetsListener(rootView) { view, insets ->
-            val systemBars = insets.getInsets(WindowInsetsCompat.Type.systemBars())
-            view.updatePadding(
-                left = systemBars.left,
-                top = systemBars.top,
-                right = systemBars.right,
-                bottom = systemBars.bottom
-            )
-            insets
         }
     }
 
