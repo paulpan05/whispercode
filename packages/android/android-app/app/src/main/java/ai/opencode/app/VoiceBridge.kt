@@ -26,7 +26,7 @@ class VoiceBridge(
     private var pendingCallback: BridgeCallback? = null
     private var stopTimeout: Runnable? = null
 
-    private var voiceState = "prewarming"
+    private var voiceState = "ready"
     private var voiceMessage: String? = null
 
     fun isReady(callback: BridgeCallback) {
@@ -42,7 +42,13 @@ class VoiceBridge(
         if (ContextCompat.checkSelfPermission(context, Manifest.permission.RECORD_AUDIO)
             != PackageManager.PERMISSION_GRANTED
         ) {
-            callback(fail("mic_permission_denied", "Microphone permission is required."), null)
+            val activity = context as? MainActivity
+            if (activity != null) {
+                activity.requestAudioPermission()
+                callback(fail("mic_permission_needed", "Microphone permission is required. Please grant permission and try again."), null)
+            } else {
+                callback(fail("mic_permission_denied", "Microphone permission is required."), null)
+            }
             return
         }
 

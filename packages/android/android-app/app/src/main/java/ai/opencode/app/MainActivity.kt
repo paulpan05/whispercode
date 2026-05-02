@@ -3,13 +3,14 @@ package ai.opencode.app
 import android.annotation.SuppressLint
 import android.content.Intent
 import android.content.pm.PackageManager
+import android.net.Uri
 import android.os.Build
 import android.os.Bundle
 import android.util.Log
-import android.view.View
 import android.view.WindowManager
 import android.webkit.ConsoleMessage
 import android.webkit.GeolocationPermissions
+import android.webkit.ValueCallback
 import android.webkit.WebChromeClient
 import android.webkit.WebResourceRequest
 import android.webkit.WebView
@@ -18,19 +19,24 @@ import androidx.activity.OnBackPressedCallback
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.appcompat.app.AppCompatActivity
 import androidx.core.content.ContextCompat
-import androidx.core.view.ViewCompat
 import androidx.core.view.WindowCompat
-import androidx.core.view.WindowInsetsCompat
-import androidx.core.view.updatePadding
 
 class MainActivity : AppCompatActivity() {
 
     internal lateinit var webView: WebView
     private lateinit var bridgeController: BridgeController
+    private var filePathCallback: ValueCallback<Array<Uri>>? = null
 
     private val permissionLauncher = registerForActivityResult(
         ActivityResultContracts.RequestMultiplePermissions()
     ) { _ -> }
+
+    private val fileChooserLauncher = registerForActivityResult(
+        ActivityResultContracts.OpenMultipleDocuments()
+    ) { uris ->
+        filePathCallback?.onReceiveValue(uris.toTypedArray())
+        filePathCallback = null
+    }
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -48,14 +54,6 @@ class MainActivity : AppCompatActivity() {
         bridgeController = BridgeController(this, webView)
 
         setupBackHandler()
-
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
-            if (ContextCompat.checkSelfPermission(this, "android.permission.POST_NOTIFICATIONS")
-                != PackageManager.PERMISSION_GRANTED
-            ) {
-                permissionLauncher.launch(arrayOf("android.permission.POST_NOTIFICATIONS"))
-            }
-        }
 
         loadContent()
     }
@@ -113,6 +111,22 @@ class MainActivity : AppCompatActivity() {
             ) {
                 callback.invoke(origin, true, false)
             }
+
+            override fun onShowFileChooser(
+                webView: WebView?,
+                filePathCallback: ValueCallback<Array<Uri>>?,
+                fileChooserParams: FileChooserParams?
+            ): Boolean {
+                this@MainActivity.filePathCallback?.onReceiveValue(null)
+                this@MainActivity.filePathCallback = filePathCallback
+                try {
+                    fileChooserLauncher.launch(arrayOf("*/*"))
+                } catch (_: Exception) {
+                    this@MainActivity.filePathCallback = null
+                    filePathCallback?.onReceiveValue(null)
+                }
+                return true
+            }
         }
 
         val useDevServer = BuildConfig.DEBUG &&
@@ -122,6 +136,23 @@ class MainActivity : AppCompatActivity() {
             webView.loadUrl("http://localhost:1422")
         } else {
             webView.loadUrl("file:///android_asset/WebAssets/index.html")
+        }
+    }
+
+    fun requestAudioPermission() {
+        if (ContextCompat.checkSelfPermission(this, "android.permission.RECORD_AUDIO")
+            != PackageManager.PERMISSION_GRANTED
+        ) {
+            permissionLauncher.launch(arrayOf("android.permission.RECORD_AUDIO"))
+        }
+    }
+
+    fun requestNotificationPermission() {
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU &&
+            ContextCompat.checkSelfPermission(this, "android.permission.POST_NOTIFICATIONS")
+                != PackageManager.PERMISSION_GRANTED
+        ) {
+            permissionLauncher.launch(arrayOf("android.permission.POST_NOTIFICATIONS"))
         }
     }
 

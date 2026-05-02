@@ -45,6 +45,7 @@ class NotificationBridge(
             if (ContextCompat.checkSelfPermission(context, Manifest.permission.POST_NOTIFICATIONS)
                 != PackageManager.PERMISSION_GRANTED
             ) {
+                (context as? MainActivity)?.requestNotificationPermission()
                 callback(null, "Notification permission not granted")
                 return
             }
