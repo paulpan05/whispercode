@@ -6,10 +6,9 @@ export { AppBaseProviders, AppInterface } from "./app"
 export { ACCEPTED_FILE_EXTENSIONS, ACCEPTED_FILE_TYPES, filePickerFilters } from "./constants/file-picker"
 export { useCommand } from "./context/command"
 export { loadLocaleDict, normalizeLocale, type Locale, useLanguage } from "./context/language"
-// UPSTREAM-DIVERGENCE: Preserve the push-related platform exports so native wrappers can share the
-// same types and helpers as the app package during upstream merges.
 export {
   type DisplayBackend,
+  type FatalRendererErrorLog,
   type NotifyOpts,
   type PairInfo,
   type PairState,
@@ -20,7 +19,6 @@ export {
   type PushPerm,
   type PushPrefs,
   type PushState,
-  usePlatform,
   PlatformProvider,
 } from "./context/platform"
 export { ServerConnection } from "./context/server"

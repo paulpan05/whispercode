@@ -284,7 +284,6 @@ const App = () => {
 
   const platform: Platform = {
     platform: "ios",
-    os: "ios",
     version: pkg.version,
     openLink: (url: string) => bridge.send("openLink", { url }),
     notify: async (title, description, href, opts) => {

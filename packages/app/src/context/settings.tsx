@@ -36,6 +36,8 @@ export interface Settings {
     shellToolPartsExpanded: boolean
     editToolPartsExpanded: boolean
     showSessionProgressBar: boolean
+    showCustomAgents: boolean
+    newLayoutDesigns?: boolean
   }
   updates: {
     startup: boolean
@@ -60,6 +62,7 @@ export interface Settings {
 export const monoDefault = "System Mono"
 export const sansDefault = "System Sans"
 export const terminalDefault = "JetBrainsMono Nerd Font Mono"
+export const newLayoutDesignsDefault = import.meta.env.VITE_OPENCODE_CHANNEL !== "prod"
 
 const monoFallback =
   'ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace'
@@ -124,6 +127,7 @@ const defaultSettings: Settings = {
     shellToolPartsExpanded: false,
     editToolPartsExpanded: false,
     showSessionProgressBar: true,
+    showCustomAgents: false,
   },
   updates: {
     startup: true,
@@ -165,6 +169,10 @@ export const { use: useSettings, provider: SettingsProvider } = createSimpleCont
   init: () => {
     const platform = usePlatform()
     const [store, setStore, _, ready] = persisted("settings.v3", createStore<Settings>(defaultSettings))
+
+    createEffect(() => {
+      console.log("settings", { ready: ready() })
+    })
 
     createEffect(() => {
       if (typeof document === "undefined") return
@@ -257,6 +265,14 @@ export const { use: useSettings, provider: SettingsProvider } = createSimpleCont
         ),
         setShowSessionProgressBar(value: boolean) {
           setStore("general", "showSessionProgressBar", value)
+        },
+        showCustomAgents: withFallback(() => store.general?.showCustomAgents, defaultSettings.general.showCustomAgents),
+        setShowCustomAgents(value: boolean) {
+          setStore("general", "showCustomAgents", value)
+        },
+        newLayoutDesigns: withFallback(() => store.general?.newLayoutDesigns, newLayoutDesignsDefault),
+        setNewLayoutDesigns(value: boolean) {
+          setStore("general", "newLayoutDesigns", value)
         },
       },
       updates: {

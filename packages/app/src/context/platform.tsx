@@ -1,6 +1,7 @@
 import { createSimpleContext } from "@opencode-ai/ui/context"
 import type { AsyncStorage, SyncStorage } from "@solid-primitives/storage"
 import type { Accessor } from "solid-js"
+import type { DesktopMenuAction } from "../desktop-menu"
 import { ServerConnection } from "./server"
 
 // UPSTREAM-DIVERGENCE-FILE: This platform contract is extended by the fork's iOS/Android wrappers.
@@ -12,8 +13,6 @@ type OpenDirectoryPickerOptions = { title?: string; multiple?: boolean }
 type OpenFilePickerOptions = { title?: string; multiple?: boolean; accept?: string[]; extensions?: string[] }
 type SaveFilePickerOptions = { title?: string; defaultPath?: string }
 type UpdateInfo = { updateAvailable: boolean; version?: string }
-// UPSTREAM-DIVERGENCE: These exported types are consumed across packages/app, packages/ios, and
-// packages/android to keep push notification permission, pairing, and relay state aligned.
 export type PushKind = "complete" | "error" | "approval" | "question" | "test"
 export type PushPerm = "unsupported" | "not-determined" | "denied" | "authorized" | "provisional" | "ephemeral"
 export type PushCred = {
@@ -80,12 +79,23 @@ export type VoiceStopResult = {
   message?: string
 }
 
+type PlatformName = "web" | "desktop" | "ios" | "android"
+type DesktopOS = "macos" | "windows" | "linux"
+
+export type FatalRendererErrorLog = {
+  error: string
+  url: string
+  version?: string
+  platform: PlatformName
+  os?: DesktopOS
+}
+
 export type Platform = {
   /** Platform discriminator */
-  platform: "web" | "desktop" | "ios" | "android"
+  platform: PlatformName
 
   /** Desktop OS (Tauri only) */
-  os?: "macos" | "windows" | "linux" | "ios" | "android"
+  os?: DesktopOS
 
   /** App version */
   version?: string
@@ -188,6 +198,15 @@ export type Platform = {
   /** Webview zoom level (desktop only) */
   webviewZoom?: Accessor<number>
 
+  /** Get whether native pinch/Ctrl-scroll zoom gestures are enabled (desktop only) */
+  getPinchZoomEnabled?(): Promise<boolean> | boolean
+
+  /** Allow native pinch/Ctrl-scroll zoom gestures (desktop only) */
+  setPinchZoomEnabled?(enabled: boolean): Promise<void> | void
+
+  /** Run a desktop-only menu action from the app chrome */
+  runDesktopMenuAction?(action: DesktopMenuAction): Promise<void> | void
+
   /** Check if an editor app exists (desktop only) */
   checkAppExists?(appName: string): Promise<boolean>
 
@@ -214,6 +233,12 @@ export type Platform = {
 
   /** Share content (mobile only) */
   share?(data: { text?: string; url?: string }): Promise<boolean>
+
+  /** Export collected diagnostic logs (desktop only) */
+  exportDebugLogs?(): Promise<string>
+
+  /** Record a fatal renderer error in platform logs (desktop only) */
+  recordFatalRendererError?(error: FatalRendererErrorLog): Promise<void>
 }
 
 export type DisplayBackend = "auto" | "wayland"

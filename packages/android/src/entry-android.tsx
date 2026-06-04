@@ -146,7 +146,6 @@ const App = () => {
 
   const platform: Platform = {
     platform: "android",
-    os: "android",
     version: pkg.version,
     openLink: (url: string) => bridge.send("openLink", { url }),
     notify: async (title, description, href, opts) => {
